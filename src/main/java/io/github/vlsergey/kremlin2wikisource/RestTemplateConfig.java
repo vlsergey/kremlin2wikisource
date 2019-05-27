@@ -19,35 +19,34 @@ import org.springframework.web.client.RestTemplate;
 
 public class RestTemplateConfig {
 
-    @Bean
-    public CloseableHttpClient httpClient() throws Exception {
-        SSLContext sslContext = new SSLContextBuilder().loadTrustMaterial(null, new TrustStrategy() {
-            @Override
-            public boolean isTrusted(X509Certificate[] arg0, String arg1) throws CertificateException {
-                return true;
-            }
-        }).build();
+	@Bean
+	public CloseableHttpClient httpClient() throws Exception {
+		SSLContext sslContext = new SSLContextBuilder().loadTrustMaterial(null, new TrustStrategy() {
+			@Override
+			public boolean isTrusted(X509Certificate[] arg0, String arg1) throws CertificateException {
+				return true;
+			}
+		}).build();
 
-        return HttpClients.custom()
-                .setDefaultRequestConfig(RequestConfig.DEFAULT)
-                .setDefaultCookieStore(new BasicCookieStore())
+		return HttpClients.custom().setDefaultRequestConfig(RequestConfig.DEFAULT)
+				.setDefaultCookieStore(new BasicCookieStore())
                 .setProxy(new HttpHost("cp-proxy.nspk.ru", 8080))
                 .setSSLHostnameVerifier(NoopHostnameVerifier.INSTANCE)
-                .setSSLContext(sslContext)
-                .build();
-    }
+				.setSSLContext(sslContext)
+				.build();
+	}
 
-    @Bean
-    public RestTemplate restTemplate(ClientHttpRequestFactory requestFactory) {
-        RestTemplate restTemplate = new RestTemplate(requestFactory);
-        return restTemplate;
-    }
+	@Bean
+	public RestTemplate restTemplate(ClientHttpRequestFactory requestFactory) {
+		RestTemplate restTemplate = new RestTemplate(requestFactory);
+		return restTemplate;
+	}
 
-    @Bean
-    public HttpComponentsClientHttpRequestFactory clientHttpRequestFactory(HttpClient httpClient) {
-        HttpComponentsClientHttpRequestFactory clientHttpRequestFactory = new HttpComponentsClientHttpRequestFactory();
-        clientHttpRequestFactory.setHttpClient(httpClient);
-        return clientHttpRequestFactory;
-    }
+	@Bean
+	public HttpComponentsClientHttpRequestFactory clientHttpRequestFactory(HttpClient httpClient) {
+		HttpComponentsClientHttpRequestFactory clientHttpRequestFactory = new HttpComponentsClientHttpRequestFactory();
+		clientHttpRequestFactory.setHttpClient(httpClient);
+		return clientHttpRequestFactory;
+	}
 
 }
