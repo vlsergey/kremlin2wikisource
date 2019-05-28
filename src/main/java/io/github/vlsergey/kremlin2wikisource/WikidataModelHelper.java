@@ -1,25 +1,22 @@
 package io.github.vlsergey.kremlin2wikisource;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.net.URI;
 import java.util.Date;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Supplier;
-
+import lombok.SneakyThrows;
 import org.apache.commons.lang3.time.DateFormatUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
-
-import com.fasterxml.jackson.databind.ObjectMapper;
-
-import lombok.SneakyThrows;
 
 @Component
 public class WikidataModelHelper {
 
 	public static final int MAX_DESCRIPTION_LENGTH = 250;
-	
+
 	private static class Claim extends LinkedHashMap<String, Object> {
 		private static final long serialVersionUID = 1L;
 	}
@@ -42,7 +39,7 @@ public class WikidataModelHelper {
 	private ObjectMapper objectMapper;
 
 	@SneakyThrows
-	private String toClaim(int propertyId, Supplier<Snak> snakSuplier) {
+	private String toClaim(Supplier<Snak> snakSuplier) {
 		Claim claim = new Claim();
 		claim.put("mainsnak", snakSuplier.get());
 		claim.put("type", "statement");
@@ -84,7 +81,7 @@ public class WikidataModelHelper {
 
 	@SneakyThrows
 	public String toMonolingualClaim(final int propertyId, final String language, final String text) {
-		return toClaim(propertyId, () -> //
+		return toClaim(() -> //
 		toSnak(propertyId, "monolingualtext", () -> //
 		toDatavalue("monolingualtext", () -> //
 		toMonolingualtextValue(language, text))));
@@ -122,14 +119,14 @@ public class WikidataModelHelper {
 
 	@SneakyThrows
 	public String toStringClaim(final int propertyId, final String value) {
-		return toClaim(propertyId, () -> //
+		return toClaim(() -> //
 		toSnak(propertyId, "string", () -> //
 		toDatavalue("string", value)));
 	}
 
 	@SneakyThrows
 	public String toTimeClaim(final int propertyId, final Date date) {
-		return toClaim(propertyId, () -> //
+		return toClaim(() -> //
 		toSnak(propertyId, "time", () -> //
 		toDatavalue("time", () -> //
 		toTimeValue(date))));
@@ -149,14 +146,14 @@ public class WikidataModelHelper {
 
 	@SneakyThrows
 	public String toUrlClaim(final int propertyId, final URI uri) {
-		return toClaim(propertyId, () -> //
+		return toClaim(() -> //
 		toSnak(propertyId, "url", () -> //
 		toDatavalue("string", uri.toString())));
 	}
 
 	@SneakyThrows
 	public String toWikibaseEntityidClaim(final int propertyId, final int numericId) {
-		return toClaim(propertyId, () -> //
+		return toClaim(() -> //
 		toSnak(propertyId, "wikibase-item", () -> //
 		toDatavalue("wikibase-entityid", () -> //
 		toWikibaseEntityidValue(numericId))));
