@@ -40,13 +40,18 @@ public class TextProcessor {
 
 	static {
 		NORMALIZED_DOC_TYPE_NAMES = new LinkedHashMap<>();
-		NORMALIZED_DOC_TYPE_NAMES.put("распоряжение", "Распоряжение");
-		NORMALIZED_DOC_TYPE_NAMES.put("распоряжения", "Распоряжение");
-		NORMALIZED_DOC_TYPE_NAMES.put("указ", "Указ");
-		NORMALIZED_DOC_TYPE_NAMES.put("указа", "Указ");
-		NORMALIZED_DOC_TYPE_NAMES.put("указами", "Указ");
-		NORMALIZED_DOC_TYPE_NAMES.put("указов", "Указ");
-		NORMALIZED_DOC_TYPE_NAMES.put("указом", "Указ");
+		NORMALIZED_DOC_TYPE_NAMES.put("распоряжение президента российской федерации", "Распоряжение Президента РФ");
+		NORMALIZED_DOC_TYPE_NAMES.put("распоряжения президента российской федерации", "Распоряжение Президента РФ");
+
+		NORMALIZED_DOC_TYPE_NAMES.put("указ президента российской федерации", "Указ Президента РФ");
+		NORMALIZED_DOC_TYPE_NAMES.put("указа президента российской федерации", "Указ Президента РФ");
+		NORMALIZED_DOC_TYPE_NAMES.put("указами президента российской федерации", "Указ Президента РФ");
+		NORMALIZED_DOC_TYPE_NAMES.put("указов президента российской федерации", "Указ Президента РФ");
+		NORMALIZED_DOC_TYPE_NAMES.put("указом президента российской федерации", "Указ Президента РФ");
+
+		NORMALIZED_DOC_TYPE_NAMES.put("федерального закона", "Федеральный закон");
+		NORMALIZED_DOC_TYPE_NAMES.put("федеральный закон", "Федеральный закон");
+		NORMALIZED_DOC_TYPE_NAMES.put("федеральными законами", "Федеральный закон");
 	}
 
 	static String addWikilinks(String src, String title, String wikilink) {
@@ -76,15 +81,27 @@ public class TextProcessor {
 		}
 	}
 
-	static String replaceAll(String src, final Pattern pattern, BiFunction<Matcher, String, String> replacement) {
+	static String replaceAll(String src, final Pattern pattern, boolean replaceInWikilinks,
+			BiFunction<Matcher, String, String> replacement) {
+		final Ranges prohibited;
+		if (!replaceInWikilinks) {
+			prohibited = new Ranges(TextRangeUtils.getWikilinkedChars(src));
+		} else {
+			prohibited = Ranges.EMPTY;
+		}
+
 		final Matcher matcher = pattern.matcher(src);
 		matcher.reset();
 		boolean result = matcher.find();
 		if (result) {
 			StringBuffer sb = new StringBuffer();
 			do {
-				String replace = replacement.apply(matcher, matcher.group(1));
-				matcher.appendReplacement(sb, replace);
+				if (!prohibited.contains(matcher.start())) {
+					String replace = replacement.apply(matcher, matcher.group(1));
+					matcher.appendReplacement(sb, replace);
+				} else {
+					matcher.appendReplacement(sb, matcher.group());
+				}
 				result = matcher.find();
 			} while (result);
 			matcher.appendTail(sb);
@@ -93,8 +110,9 @@ public class TextProcessor {
 		return src;
 	}
 
-	static String replaceAll(String src, String regexp, BiFunction<Matcher, String, String> replacement) {
-		return replaceAll(src, Pattern.compile(regexp), replacement);
+	static String replaceAll(String src, String regexp, boolean replaceInWikilinks,
+			BiFunction<Matcher, String, String> replacement) {
+		return replaceAll(src, Pattern.compile(regexp), replaceInWikilinks, replacement);
 	}
 
 	@Autowired
@@ -689,7 +707,7 @@ public class TextProcessor {
 		content = processTables(content);
 
 		// строки, начавшиеся с открытия скобки
-		content = replaceAll(content, Pattern.compile("(\\n|^)\\s*\\(([^\\)]+)\\)\n", Pattern.DOTALL),
+		content = replaceAll(content, Pattern.compile("(\\n|^)\\s*\\(([^\\)]+)\\)\n", Pattern.DOTALL), true,
 				(matcher, g1) -> matcher.group(1) + "(" + matcher.group(2).replace('\n', ' ') + ")\n");
 
 		// объединение строк
@@ -724,7 +742,7 @@ public class TextProcessor {
 		content = content.replaceAll("\\n[ ]+([^\\s].*)\\n", "\n{{center|$1}}\n");
 
 		// awards
-		content = replaceAll(content, "\\n=== [«\"]ЗАСЛУЖЕННЫЙ (.*) РОССИЙСКОЙ ФЕДЕРАЦИИ[»\"] ===\n",
+		content = replaceAll(content, "\\n=== [«\"]ЗАСЛУЖЕННЫЙ (.*) РОССИЙСКОЙ ФЕДЕРАЦИИ[»\"] ===\n", true,
 				(matcher, g1) -> "\n=== [[:w:ru:Заслуженный " + g1.toLowerCase() + " Российской Федерации|«ЗАСЛУЖЕННЫЙ "
 						+ g1 + " {{nobr|РОССИЙСКОЙ ФЕДЕРАЦИИ}}»]] ===\n");
 
@@ -764,6 +782,45 @@ public class TextProcessor {
 		content = content.replaceAll("статьями (\\d+) и (\\d+) Конституции Российской Федерации",
 				"[[Конституция Российской Федерации#Статья $1|статьями $1]] и [[Конституция Российской Федерации#Статья $2|$2]] Конституции Российской Федерации");
 
+		final String presidentRegexp = "\\s+Президента\\s+Российской\\s+Федерации";
+		final String singleDocTypeRegexp = "(" + "[Рр]аспоряжение" + presidentRegexp //
+				+ "|" + "[Рр]аспоряжения" + presidentRegexp //
+				+ "|" + "[Уу]каз" + presidentRegexp //
+				+ "|" + "[Уу]каза" + presidentRegexp //
+				+ "|" + "[Уу]казом" + presidentRegexp //
+				+ "|" + "[Фф]едерального закона" //
+				+ "|" + "[Фф]едеральный закон" //
+				+ ")";
+		final String docDateRegexp = "от (" + REGEXP_DATE_DOTS + "|" + REGEXP_DATE_HUMAN + ") г.";
+		final String docNumberRegexp = "\\{\\{nobr\\|№ (\\d[\\dа-я]*\\-?Ф?З?р?п?)\\}\\}";
+		final String docOptionalTitleRegexp = "( «([^\"\\«\\»]+)»)?";
+
+		content = replaceAll(content, "статьей (\\d+) " + singleDocTypeRegexp + " " + docDateRegexp + " "
+				+ docNumberRegexp + docOptionalTitleRegexp, false, (matcher, g1) -> {
+					try {
+						final String articleNumber = matcher.group(1);
+						final String strDocType = matcher.group(2);
+						final String normDocType = NORMALIZED_DOC_TYPE_NAMES.get(strDocType.toLowerCase());
+						final String strDate = matcher.group(3);
+						final Date date = parseDate(strDate);
+						final String docNumber = matcher.group(4);
+						final String title = matcher.group(6);
+
+						return "[[" + normDocType + " от " + DATE_FORMAT_DOTS.format(date) + " № " + docNumber
+								+ "#Статья " + articleNumber + "|статьей " + articleNumber + " " + strDocType
+								+ " {{nobr|от " + strDate + " г.}} {{nobr|№ " + docNumber + "}}"
+								+ (isBlank(title) ? "" : " «" + title + "»") + "]]";
+					} catch (Exception exc) {
+						log.error("Unable to convert " + matcher.group(), exc);
+						return matcher.group();
+					}
+				});
+
+		/*
+		 * В связи с принятием Федерального закона от 169-ФЗ г. {{nobr|№ 169-ФЗ}} «О
+		 * внесении изменений и дополнений в Закон Российской Федерации „О статусе судей
+		 * в Российской Федерации“» постановляю:
+		 */
 		/*
 		 * абзац; (Утратил силу с 1 июля 2003 г. — Указ Президента Российской Федерации
 		 * от 19.11.2003 г. N 1365)
@@ -776,8 +833,7 @@ public class TextProcessor {
 		 * распоряжением, следующие изменения:
 		 */
 		content = replaceAll(content,
-				"([Рр]аспоряжение|[Рр]аспоряжения|Указ|Указа|Указом)\\s+Президента\\s+Российской\\s+Федерации\\s+"
-						+ "от\\s+(.*)\\s+г.\\s+\\" + "{\\{nobr\\|№\\s+([0-9][0-9а-я\\-]*)\\}\\}" + "( «([^»\"\n]+)»)?",
+				singleDocTypeRegexp + " " + docDateRegexp + " " + docNumberRegexp + docOptionalTitleRegexp, false,
 				(matcher, g1) -> {
 					try {
 						final String normDocType = NORMALIZED_DOC_TYPE_NAMES.get(matcher.group(1).toLowerCase());
@@ -785,42 +841,47 @@ public class TextProcessor {
 						final Date date = parseDate(strDate);
 						String docNumber = matcher.group(3);
 						if (isBlank(matcher.group(4))) {
-							return "[[" + normDocType + " Президента РФ от " + DATE_FORMAT_DOTS.format(date) + " № "
-									+ docNumber + "|" + matcher.group(1) + " Президента Российской Федерации {{nobr|от "
-									+ strDate + " г.}} {{nobr|№ " + docNumber + "}}]]";
+							return "[[" + normDocType + " от " + DATE_FORMAT_DOTS.format(date) + " № " + docNumber + "|"
+									+ matcher.group(1) + " {{nobr|от " + strDate + " г.}} {{nobr|№ " + docNumber
+									+ "}}]]";
 						}
 						final String title = matcher.group(5);
-						return "[[" + normDocType + " Президента РФ от " + DATE_FORMAT_DOTS.format(date) + " № "
-								+ docNumber + "|" + matcher.group(1) + " Президента Российской Федерации {{nobr|от "
-								+ strDate + " г.}} {{nobr|№ " + docNumber + "}} «" + title + "»]]";
+						return "[[" + normDocType + " от " + DATE_FORMAT_DOTS.format(date) + " № " + docNumber + "|"
+								+ matcher.group(1) + " {{nobr|от " + strDate + " г.}} {{nobr|№ " + docNumber + "}} «"
+								+ title + "»]]";
 					} catch (Exception exc) {
 						log.error("Unable to convert " + matcher.group(), exc);
 						return matcher.group();
 					}
 				});
 
-		final String regexpItem = "от (" + REGEXP_DATE_DOTS + "|" + REGEXP_DATE_HUMAN
-				+ ") г. \\{\\{nobr\\|№ ([0-9][0-9а-я\\-]+)\\}\\}(\\s+«([^»]+)»)?";
-		content = replaceAll(content, "(указов|указами)\\s+Президента\\s+Российской\\s+Федерации\\s+" + "(("
-				+ regexpItem + "(\\sи\\s|[;\\)\\n ]+|$)" + ")+)", (matcher, g1) -> {
+		final String multipleDocTypeRegexp = "(" + "[Рр]аспоряжения" + presidentRegexp //
+				+ "|" + "[Уу]казами" + presidentRegexp //
+				+ "|" + "[Уу]казов" + presidentRegexp //
+				+ "|" + "[Уу]казы" + presidentRegexp //
+				+ "|" + "[Фф]едеральные законы" //
+				+ "|" + "[Фф]едеральными законами" //
+				+ ")";
+		final String regexpItem = docDateRegexp + " " + docNumberRegexp + docOptionalTitleRegexp;
+		content = replaceAll(content, multipleDocTypeRegexp + "\\s+((" + regexpItem + "(\\sи\\s|[;\\)\\n ]+|$)" + ")+)",
+				false, (matcher, g1) -> {
 					try {
 						final StringBuilder builder = new StringBuilder();
 						final String normDocType = NORMALIZED_DOC_TYPE_NAMES.get(matcher.group(1).toLowerCase());
-
 						builder.append(g1);
-						builder.append(" Президента Российской Федерации ");
+						builder.append(" ");
 
 						final String all = matcher.group(2);
-						final String wikilinked = replaceAll(all, regexpItem, (itemMatcher, itemG1) -> {
+						final String wikilinked = replaceAll(all, regexpItem, true, (itemMatcher, itemG1) -> {
 							try {
 								final String itemStrDate = itemMatcher.group(1);
 								final Date itemDate = parseDate(itemStrDate);
 								final String itemNumber = itemMatcher.group(2);
 								final String itemTitle = itemMatcher.group(4);
 
-								return "[[" + normDocType + " Президента РФ от " + DATE_FORMAT_DOTS.format(itemDate)
-										+ " № " + itemNumber + "|от {{nobr|" + itemStrDate + " г.}} {{nobr|№ "
-										+ itemNumber + "}}" + (isBlank(itemTitle) ? "" : " «" + itemTitle + "»") + "]]";
+								return "[[" + normDocType + " от " + DATE_FORMAT_DOTS.format(itemDate) + " № "
+										+ itemNumber + "|от {{nobr|" + itemStrDate + " г.}} {{nobr|№ " + itemNumber
+										+ "}}" + (isBlank(itemTitle) ? "" : " «" + itemTitle + "»") + "]]";
 							} catch (Exception exc) {
 								log.error(exc.getMessage(), exc);
 								return itemMatcher.group();
@@ -834,51 +895,9 @@ public class TextProcessor {
 					}
 				});
 
-		content = replaceAll(content,
-				"статьей (\\d+) Федерального закона от ([0-9]+\\s+[а-я]+\\s+\\d+) г. \\{\\{nobr\\|№ (\\d+\\-ФЗ)\\}\\} «([^\"]+)»",
-				(matcher, g1) -> {
-					try {
-						String articleNumber = matcher.group(1);
-						Date date = DATE_FORMAT_HUMAN.parse(matcher.group(2));
-						String docNumber = matcher.group(3);
-						String title = matcher.group(4);
-						return "[[Федеральный закон от " + DATE_FORMAT_DOTS.format(date) + " № " + docNumber
-								+ "#Статья " + articleNumber + "|статьей " + articleNumber + " Федерального закона от "
-								+ matcher.group(2) + " г. {{nobr|№ " + docNumber + "}} «" + title + "»]]";
-					} catch (Exception exc) {
-						log.error("Unable to convert " + matcher.group(), exc);
-						return matcher.group();
-					}
-				});
-
-		content = replaceAll(content,
-				"Федерального закона от ([0-9]+\\s+[а-я]+\\s+\\d+) г. \\{\\{nobr\\|№ (\\d+\\-ФЗ)\\}\\} «([^\"\n]+)»",
-				(matcher, g1) -> {
-					try {
-						Date date = DATE_FORMAT_HUMAN.parse(matcher.group(1));
-						String docNumber = matcher.group(2);
-						String title = matcher.group(3);
-						return "[[Федеральный закон от " + DATE_FORMAT_DOTS.format(date) + " № " + docNumber
-								+ "|Федерального закона от " + matcher.group(2) + " г. {{nobr|№ " + docNumber + "}} «"
-								+ title + "»]]";
-					} catch (Exception exc) {
-						log.error("Unable to convert " + matcher.group(), exc);
-						return matcher.group();
-					}
-				});
-
 		content = content.replaceAll("резолюцией Совета Безопасности ООН (\\d+) от \\d+ [а-я]+ (\\d+) г.",
 				"[[Резолюция Совета Безопасности ООН № S/RES/$1 ($2)|$0]]");
 
-		return content;
-	}
-
-	private String wrapInLeft(String content, final int signStart, String regexp, String replacement)
-			throws AssertionError {
-		final Matcher signPlaceMatcher = Pattern.compile(regexp).matcher(content);
-		if (!signPlaceMatcher.find(signStart))
-			throw new AssertionError();
-		content = signPlaceMatcher.replaceFirst(replacement);
 		return content;
 	}
 
