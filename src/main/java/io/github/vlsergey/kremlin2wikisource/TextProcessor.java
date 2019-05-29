@@ -41,6 +41,7 @@ public class TextProcessor {
 	static {
 		NORMALIZED_DOC_TYPE_NAMES = new LinkedHashMap<>();
 		NORMALIZED_DOC_TYPE_NAMES.put("распоряжение президента российской федерации", "Распоряжение Президента РФ");
+		NORMALIZED_DOC_TYPE_NAMES.put("распоряжением президента российской федерации", "Распоряжение Президента РФ");
 		NORMALIZED_DOC_TYPE_NAMES.put("распоряжения президента российской федерации", "Распоряжение Президента РФ");
 
 		NORMALIZED_DOC_TYPE_NAMES.put("указ президента российской федерации", "Указ Президента РФ");
@@ -564,7 +565,7 @@ public class TextProcessor {
 		final String[] lines = (src.trim() + "\n").replace("\n", "\n☆").split("☆");
 		for (int lineIndex = 0; lineIndex < lines.length; lineIndex++) {
 			final String line = lines[lineIndex];
-			if (line.matches("^\\s+(УТВЕРЖДЕНЫ|ПРИЛОЖЕНИЕ)(\\s+N\\s+[0-9])?\n$")) {
+			if (line.matches("^\\s+(УТВЕРЖДЕН[АЫ]|ПРИЛОЖЕНИЕ)(\\s+N\\s+[0-9])?\n$")) {
 				while (lineIndex < lines.length && !lines[lineIndex].trim().isEmpty()) {
 					String nextLine = lines[lineIndex].trim();
 					nextLine = nextLine.replaceAll("N (\\d[\\d\\-а-я]*)([ ]|$)", "№ $1$2");
@@ -784,6 +785,7 @@ public class TextProcessor {
 
 		final String presidentRegexp = "\\s+Президента\\s+Российской\\s+Федерации";
 		final String singleDocTypeRegexp = "(" + "[Рр]аспоряжение" + presidentRegexp //
+				+ "|" + "[Рр]аспоряжением" + presidentRegexp //
 				+ "|" + "[Рр]аспоряжения" + presidentRegexp //
 				+ "|" + "[Уу]каз" + presidentRegexp //
 				+ "|" + "[Уу]каза" + presidentRegexp //
