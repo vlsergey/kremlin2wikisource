@@ -9,7 +9,6 @@ import java.util.*;
 import java.util.function.BiFunction;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
@@ -45,6 +44,7 @@ public class TextProcessor {
 		NORMALIZED_DOC_TYPE_NAMES.put("распоряжения", "Распоряжение");
 		NORMALIZED_DOC_TYPE_NAMES.put("указ", "Указ");
 		NORMALIZED_DOC_TYPE_NAMES.put("указа", "Указ");
+		NORMALIZED_DOC_TYPE_NAMES.put("указами", "Указ");
 		NORMALIZED_DOC_TYPE_NAMES.put("указов", "Указ");
 		NORMALIZED_DOC_TYPE_NAMES.put("указом", "Указ");
 	}
@@ -799,11 +799,10 @@ public class TextProcessor {
 					}
 				});
 
-		content = replaceAll(content,
-				"(указов)\\s+Президента\\s+Российской\\s+Федерации\\s+" + "((от\\s+(" + REGEXP_DATE_DOTS + "|"
-						+ REGEXP_DATE_HUMAN + ")\\s+г.\\s+\\" + "{\\{nobr\\|№\\s+[0-9][0-9а-я\\-]*\\}\\}"
-						+ "([;\\)\\n ]+|$))+)",
-				(matcher, g1) -> {
+		final String regexpItem = "от (" + REGEXP_DATE_DOTS + "|" + REGEXP_DATE_HUMAN
+				+ ") г. \\{\\{nobr\\|№ ([0-9][0-9а-я\\-]+)\\}\\}(\\s+«([^»]+)»)?";
+		content = replaceAll(content, "(указов|указами)\\s+Президента\\s+Российской\\s+Федерации\\s+" + "(("
+				+ regexpItem + "(\\sи\\s|[;\\)\\n ]+|$)" + ")+)", (matcher, g1) -> {
 					try {
 						final StringBuilder builder = new StringBuilder();
 						final String normDocType = NORMALIZED_DOC_TYPE_NAMES.get(matcher.group(1).toLowerCase());
@@ -812,28 +811,21 @@ public class TextProcessor {
 						builder.append(" Президента Российской Федерации ");
 
 						final String all = matcher.group(2);
-						final List<String> splitted = Arrays
-								.asList(all.replace(";", "☆;☆").replace(")", "☆)☆").replace("\n", "☆\n☆").split("☆"));
-						String wikilinked = splitted.stream().map(str -> {
+						final String wikilinked = replaceAll(all, regexpItem, (itemMatcher, itemG1) -> {
 							try {
-								final Matcher itemMatcher = Pattern
-										.compile("^(\\s*)от (.*) г. \\{\\{nobr\\|№\\s+([0-9][0-9а-я\\-]*)\\}\\}$")
-										.matcher(str);
-								if (!itemMatcher.matches()) {
-									return str;
-								}
-								final String strDate = itemMatcher.group(2);
-								final Date date = parseDate(strDate);
-								String docNumber = itemMatcher.group(3);
+								final String itemStrDate = itemMatcher.group(1);
+								final Date itemDate = parseDate(itemStrDate);
+								final String itemNumber = itemMatcher.group(2);
+								final String itemTitle = itemMatcher.group(4);
 
-								return itemMatcher.group(1) + "[[" + normDocType + " Президента РФ от "
-										+ DATE_FORMAT_DOTS.format(date) + " № " + docNumber + "|{{nobr|от " + strDate
-										+ " г.}} {{nobr|№ " + docNumber + "}}]]";
+								return "[[" + normDocType + " Президента РФ от " + DATE_FORMAT_DOTS.format(itemDate)
+										+ " № " + itemNumber + "|от {{nobr|" + itemStrDate + " г.}} {{nobr|№ "
+										+ itemNumber + "}}" + (isBlank(itemTitle) ? "" : " «" + itemTitle + "»") + "]]";
 							} catch (Exception exc) {
-								log.error("Unable to convert " + matcher.group(), exc);
-								return matcher.group();
+								log.error(exc.getMessage(), exc);
+								return itemMatcher.group();
 							}
-						}).collect(Collectors.joining());
+						});
 						builder.append(wikilinked);
 						return builder.toString();
 					} catch (Exception exc) {
