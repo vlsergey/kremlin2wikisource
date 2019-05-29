@@ -116,7 +116,7 @@ public class Importer {
 
 	public void run() throws Exception {
 		// first was 18272
-		for (int pageId = 18574; pageId <= 20000; pageId++) {
+		for (int pageId = 18588; pageId <= 20000; pageId++) {
 			URI uri = URI.create("http://www.kremlin.ru/acts/bank/" + pageId);
 			try {
 				importFrom(uri);

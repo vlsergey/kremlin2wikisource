@@ -1,12 +1,12 @@
 package io.github.vlsergey.kremlin2wikisource;
 
+import static io.github.vlsergey.kremlin2wikisource.RegexpUtils.replaceAll;
 import static org.apache.commons.lang3.StringUtils.*;
 
 import java.net.URI;
 import java.text.MessageFormat;
 import java.text.SimpleDateFormat;
 import java.util.*;
-import java.util.function.BiFunction;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.IntStream;
@@ -57,11 +57,6 @@ public class TextProcessor {
 		NORMALIZED_DOC_TYPE_NAMES.put("федеральным конституционным законом", "Федеральный конституционный закон");
 	}
 
-	static String addWikilinks(String src, String title, String wikilink) {
-		return Pattern.compile("( )(" + Pattern.quote(title) + ")( )", Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE)
-				.matcher(src).replaceAll("$1[[:w:ru:" + wikilink + "|$2]]$3");
-	}
-
 	static void assertNotBlank(String str) {
 		if (isBlank(str)) {
 			throw new AssertionError();
@@ -84,42 +79,32 @@ public class TextProcessor {
 		}
 	}
 
-	static String replaceAll(String src, final Pattern pattern, boolean replaceInWikilinks,
-			BiFunction<Matcher, String, String> replacement) {
-		final Ranges prohibited;
-		if (!replaceInWikilinks) {
-			prohibited = new Ranges(TextRangeUtils.getWikilinkedChars(src));
-		} else {
-			prohibited = Ranges.EMPTY;
-		}
-
-		final Matcher matcher = pattern.matcher(src);
-		matcher.reset();
-		boolean result = matcher.find();
-		if (result) {
-			StringBuffer sb = new StringBuffer();
-			do {
-				if (!prohibited.contains(matcher.start())) {
-					String replace = replacement.apply(matcher, matcher.group(1));
-					matcher.appendReplacement(sb, replace);
-				} else {
-					matcher.appendReplacement(sb, matcher.group());
-				}
-				result = matcher.find();
-			} while (result);
-			matcher.appendTail(sb);
-			return sb.toString();
-		}
-		return src;
-	}
-
-	static String replaceAll(String src, String regexp, boolean replaceInWikilinks,
-			BiFunction<Matcher, String, String> replacement) {
-		return replaceAll(src, Pattern.compile(regexp), replaceInWikilinks, replacement);
-	}
-
 	@Autowired
 	private WikidataModelHelper wikidataModelHelper;
+
+	private Optional<Integer> getDelimeter(int lines, int[] candidates, float minSureProcent) {
+		int[] candidateColumns = IntStream.range(0, candidates.length).filter(i -> candidates[i] != 0).mapToObj(i -> i)
+				.sorted(Comparator.<Integer, Integer>comparing(i -> Integer.valueOf(candidates[i])).reversed())
+				.mapToInt(i -> i).toArray();
+
+		if (candidateColumns.length == 0) {
+			return Optional.empty();
+		}
+
+		final int mostOftenDelimeterPos = candidateColumns[0];
+		if (candidateColumns.length == 1) {
+			if (1.0 * candidates[mostOftenDelimeterPos] / lines < minSureProcent) {
+				// just occasion
+				return Optional.empty();
+			}
+			return Optional.of(mostOftenDelimeterPos);
+		}
+		if (candidates[mostOftenDelimeterPos] - candidates[candidateColumns[1]] < 2) {
+			// not stable enough
+			return Optional.empty();
+		}
+		return Optional.of(mostOftenDelimeterPos);
+	}
 
 	ToUpload importAsРаспоряжение(URI url, String title, String summary, String contentWithHeader) throws Exception {
 		contentWithHeader = contentWithHeader.replaceAll("\\r", "");
@@ -308,140 +293,6 @@ public class TextProcessor {
 		return toUpload;
 	}
 
-	private Optional<Integer> getDelimeter(int lines, int[] candidates, float minSureProcent) {
-		int[] candidateColumns = IntStream.range(0, candidates.length).filter(i -> candidates[i] != 0).mapToObj(i -> i)
-				.sorted(Comparator.<Integer, Integer>comparing(i -> Integer.valueOf(candidates[i])).reversed())
-				.mapToInt(i -> i).toArray();
-
-		if (candidateColumns.length == 0) {
-			return Optional.empty();
-		}
-
-		final int mostOftenDelimeterPos = candidateColumns[0];
-		if (candidateColumns.length == 1) {
-			if (1.0 * candidates[mostOftenDelimeterPos] / lines < minSureProcent) {
-				// just occasion
-				return Optional.empty();
-			}
-			return Optional.of(mostOftenDelimeterPos);
-		}
-		if (candidates[mostOftenDelimeterPos] - candidates[candidateColumns[1]] < 2) {
-			// not stable enough
-			return Optional.empty();
-		}
-		return Optional.of(mostOftenDelimeterPos);
-	}
-
-	String processSignature(String src) {
-		final String[] lines = (src.trim() + "\n").replace("\n", "\n☆").split("☆");
-
-		Pattern signPattern = Pattern.compile("^\\s+(Президент Российской Федерации)\\s+([А-Я]\\.\\s*[А-Я][а-я]*)\\n$");
-
-		for (int i = 0; i < lines.length; i++) {
-			Matcher signMatcher = signPattern.matcher(lines[i]);
-			if (!signMatcher.matches()) {
-				continue;
-			}
-			lines[i] = "{{Подпись|" + signMatcher.group(1) + "|" + signMatcher.group(2) + "}}\n";
-
-			// usually after signature there is a lift-aligned lines
-			if (i + 2 < lines.length && lines[i + 1].trim().isEmpty()) {
-				for (int n = i + 2; n < lines.length; n++) {
-					String nextLine = lines[n].trim();
-					if (nextLine.isEmpty())
-						break;
-
-					if (nextLine.matches("^\\s*_{5,}\\s*$")) {
-						lines[n] = "\n\n\n" + nextLine.trim() + "\n\n\n";
-						break;
-					}
-
-					nextLine = nextLine.replaceAll("^N (\\d)", "№ $1");
-					lines[n] = "{{left|" + nextLine + "}}\n";
-				}
-			}
-
-			// only single signature per doc
-			break;
-		}
-
-		return join(lines);
-	}
-
-	private String processBorderlessSinglelineCellsTables(String src) {
-		// ширина таблицы из двух колонок одинаковая для разных указов... но вот какая?
-		final String[] lines = (src.trim() + "\n").replace("\n", "\n☆").split("☆");
-
-		MultiValueMap<Integer, Integer> firstLinesOfTables = new LinkedMultiValueMap<>();
-		int[] candidates = new int[Arrays.stream(lines).mapToInt(String::length).max().getAsInt()];
-		for (int firstLineIndex = 1; firstLineIndex < lines.length; firstLineIndex++) {
-			final String line = lines[firstLineIndex];
-			if (line.equals("\n"))
-				continue;
-
-			// not a first line for sure
-			if (!"\n".equals(lines[firstLineIndex - 1]))
-				continue;
-
-			d: for (int d = line.indexOf('-', 2); d != -1; d = line.indexOf('-', d + 1)) {
-				if (line.charAt(d - 1) != ' ' || line.length() == d + 1 || line.charAt(d + 1) != ' ') {
-					continue d;
-				}
-
-				// check next lines if d is good delimeter candidate
-				for (int n = firstLineIndex + 1; n < lines.length; n++) {
-					String nextLine = lines[n];
-					if ("\n".equals(nextLine)) {
-						candidates[d] += n - firstLineIndex + 1;
-						firstLinesOfTables.add(d, firstLineIndex);
-						continue d;
-					}
-					if (!" - ".equals(substring(nextLine, d - 1, d + 2))) {
-						continue d;
-					}
-				}
-			}
-		}
-
-		Optional<Integer> delimeterPositionOptional = getDelimeter(lines.length, candidates, 0.5F);
-		if (!delimeterPositionOptional.isPresent()) {
-			return src;
-		}
-		final int delimiterPosition = delimeterPositionOptional.get();
-
-		final int lineWidth = Arrays.stream(lines).mapToInt(String::length).max().getAsInt();
-		final int column1Width = Math.round(100F * (delimiterPosition - 2) / lineWidth);
-		final int column2Width = Math.round(300F / lineWidth);
-		final int column3Width = 100 - column1Width - column2Width;
-
-		for (int firstLineIndex : firstLinesOfTables.get(delimiterPosition)) {
-			StringBuilder table = new StringBuilder();
-			table.append("{|\n");
-
-			for (int row = firstLineIndex; row < lines.length; row++) {
-				if (!" - ".equals(substring(lines[row], delimiterPosition - 1, delimiterPosition + 2))) {
-					// table ended
-					break;
-				}
-
-				String cell1 = substring(lines[row], 0, delimiterPosition);
-				String cell2 = substring(lines[row], delimiterPosition + 1, lines[row].length());
-
-				table.append("| align=left valign=top width=" + column1Width + "% | " + cell1.trim() + "\n");
-				table.append("| align=left valign=top width=" + column2Width + "% | —\n");
-				table.append("| align=left valign=top width=" + column3Width + "% | " + cell2.trim() + "\n");
-				table.append("|-\n");
-
-				lines[row] = "";
-			}
-
-			table.append("|}\n");
-			lines[firstLineIndex] = table.toString();
-		}
-
-		return join(lines);
-	}
-
 	private String processBorderlessMultilineCellsTables(String src) {
 		// ширина таблицы из двух колонок одинаковая для разных указов... но вот какая?
 		final String[] lines = (src.trim() + "\n").replace("\n", "\n☆").split("☆");
@@ -526,6 +377,80 @@ public class TextProcessor {
 		return withTables.toString().replace("\n|}\n\n{|\n", "\n|-\n");
 	}
 
+	private String processBorderlessSinglelineCellsTables(String src) {
+		// ширина таблицы из двух колонок одинаковая для разных указов... но вот какая?
+		final String[] lines = (src.trim() + "\n").replace("\n", "\n☆").split("☆");
+
+		MultiValueMap<Integer, Integer> firstLinesOfTables = new LinkedMultiValueMap<>();
+		int[] candidates = new int[Arrays.stream(lines).mapToInt(String::length).max().getAsInt()];
+		for (int firstLineIndex = 1; firstLineIndex < lines.length; firstLineIndex++) {
+			final String line = lines[firstLineIndex];
+			if (line.equals("\n"))
+				continue;
+
+			// not a first line for sure
+			if (!"\n".equals(lines[firstLineIndex - 1]))
+				continue;
+
+			d: for (int d = line.indexOf('-', 2); d != -1; d = line.indexOf('-', d + 1)) {
+				if (line.charAt(d - 1) != ' ' || line.length() == d + 1 || line.charAt(d + 1) != ' ') {
+					continue d;
+				}
+
+				// check next lines if d is good delimeter candidate
+				for (int n = firstLineIndex + 1; n < lines.length; n++) {
+					String nextLine = lines[n];
+					if ("\n".equals(nextLine)) {
+						candidates[d] += n - firstLineIndex + 1;
+						firstLinesOfTables.add(d, firstLineIndex);
+						continue d;
+					}
+					if (!" - ".equals(substring(nextLine, d - 1, d + 2))) {
+						continue d;
+					}
+				}
+			}
+		}
+
+		Optional<Integer> delimeterPositionOptional = getDelimeter(lines.length, candidates, 0.5F);
+		if (!delimeterPositionOptional.isPresent()) {
+			return src;
+		}
+		final int delimiterPosition = delimeterPositionOptional.get();
+
+		final int lineWidth = Arrays.stream(lines).mapToInt(String::length).max().getAsInt();
+		final int column1Width = Math.round(100F * (delimiterPosition - 2) / lineWidth);
+		final int column2Width = Math.round(300F / lineWidth);
+		final int column3Width = 100 - column1Width - column2Width;
+
+		for (int firstLineIndex : firstLinesOfTables.get(delimiterPosition)) {
+			StringBuilder table = new StringBuilder();
+			table.append("{|\n");
+
+			for (int row = firstLineIndex; row < lines.length; row++) {
+				if (!" - ".equals(substring(lines[row], delimiterPosition - 1, delimiterPosition + 2))) {
+					// table ended
+					break;
+				}
+
+				String cell1 = substring(lines[row], 0, delimiterPosition);
+				String cell2 = substring(lines[row], delimiterPosition + 1, lines[row].length());
+
+				table.append("| align=left valign=top width=" + column1Width + "% | " + cell1.trim() + "\n");
+				table.append("| align=left valign=top width=" + column2Width + "% | —\n");
+				table.append("| align=left valign=top width=" + column3Width + "% | " + cell2.trim() + "\n");
+				table.append("|-\n");
+
+				lines[row] = "";
+			}
+
+			table.append("|}\n");
+			lines[firstLineIndex] = table.toString();
+		}
+
+		return join(lines);
+	}
+
 	private String processObvilions(String src) {
 		final String[] lines = (src.trim() + "\n").replace("\n", "\n☆").split("☆");
 		line: for (int i = 0; i < lines.length - 1; i++) {
@@ -560,6 +485,42 @@ public class TextProcessor {
 				}
 			}
 		}
+		return join(lines);
+	}
+
+	String processSignature(String src) {
+		final String[] lines = (src.trim() + "\n").replace("\n", "\n☆").split("☆");
+
+		Pattern signPattern = Pattern.compile("^\\s+(Президент Российской Федерации)\\s+([А-Я]\\.\\s*[А-Я][а-я]*)\\n$");
+
+		for (int i = 0; i < lines.length; i++) {
+			Matcher signMatcher = signPattern.matcher(lines[i]);
+			if (!signMatcher.matches()) {
+				continue;
+			}
+			lines[i] = "{{Подпись|" + signMatcher.group(1) + "|" + signMatcher.group(2) + "}}\n";
+
+			// usually after signature there is a lift-aligned lines
+			if (i + 2 < lines.length && lines[i + 1].trim().isEmpty()) {
+				for (int n = i + 2; n < lines.length; n++) {
+					String nextLine = lines[n].trim();
+					if (nextLine.isEmpty())
+						break;
+
+					if (nextLine.matches("^\\s*_{5,}\\s*$")) {
+						lines[n] = "\n\n\n" + nextLine.trim() + "\n\n\n";
+						break;
+					}
+
+					nextLine = nextLine.replaceAll("^N (\\d)", "№ $1");
+					lines[n] = "{{left|" + nextLine + "}}\n";
+				}
+			}
+
+			// only single signature per doc
+			break;
+		}
+
 		return join(lines);
 	}
 
@@ -751,31 +712,7 @@ public class TextProcessor {
 		// other centered strings
 		content = content.replaceAll("\\n[ ]+([^\\s].*)\\n", "\n{{center|$1}}\n");
 
-		// awards
-		content = replaceAll(content, "\\n=== [«\"]ЗАСЛУЖЕННЫЙ (.*) РОССИЙСКОЙ ФЕДЕРАЦИИ[»\"] ===\n", true,
-				(matcher, g1) -> "\n=== [[:w:ru:Заслуженный " + g1.toLowerCase() + " Российской Федерации|«ЗАСЛУЖЕННЫЙ "
-						+ g1 + " {{nobr|РОССИЙСКОЙ ФЕДЕРАЦИИ}}»]] ===\n");
-
-		for (String years : new String[] { "XX", "XXV", "XXX", "XL", "L" })
-			content = addWikilinks(content, "ЗНАКОМ ОТЛИЧИЯ \"ЗА БЕЗУПРЕЧНУЮ СЛУЖБУ\" " + years + " ЛЕТ",
-					"Знак отличия «За безупречную службу» " + years + " лет");
-
-		content = addWikilinks(content, "МЕДАЛЬЮ НЕСТЕРОВА", "Медаль Нестерова");
-		content = addWikilinks(content, "МЕДАЛЬЮ ОРДЕНА \"ЗА ЗАСЛУГИ ПЕРЕД ОТЕЧЕСТВОМ\" I СТЕПЕНИ",
-				"Медаль ордена «За заслуги перед Отечеством» I степени");
-		content = addWikilinks(content, "МЕДАЛЬЮ ОРДЕНА \"ЗА ЗАСЛУГИ ПЕРЕД ОТЕЧЕСТВОМ\" II СТЕПЕНИ",
-				"Медаль ордена «За заслуги перед Отечеством» II степени");
-		content = addWikilinks(content, "МЕДАЛЬЮ \"ЗА СПАСЕНИЕ ПОГИБАВШИХ\"", "Медаль «За спасение погибавших»");
-
-		content = addWikilinks(content, "ОРДЕНОМ АЛЕКСАНДРА НЕВСКОГО", "Орден Александра Невского (Россия)");
-		content = addWikilinks(content, "ОРДЕНОМ ДРУЖБЫ", "Орден Дружбы (Россия)");
-		content = addWikilinks(content, "ОРДЕНОМ МУЖЕСТВА", "Орден Мужества");
-		content = addWikilinks(content, "ОРДЕНОМ ПОЧЕТА", "Орден Почёта (Россия)");
-		for (String ledge : new String[] { "I", "II", "III", "IV" })
-			content = addWikilinks(content, "ОРДЕНОМ \"ЗА ЗАСЛУГИ ПЕРЕД ОТЕЧЕСТВОМ\" " + ledge + " СТЕПЕНИ",
-					"Орден «За заслуги перед Отечеством» " + ledge + " степени");
-
-		content = addWikilinks(content, "ОРДЕНОМ \"РОДИТЕЛЬСКАЯ СЛАВА\"", "Орден «Родительская слава»");
+		content = AwardsUtils.wikilink(content);
 
 		// quotes
 		content = content.replaceAll("\\n\"(.*)\"([\\.;])\\n", "\n<blockquote>«$1»$2</blockquote>\n");
