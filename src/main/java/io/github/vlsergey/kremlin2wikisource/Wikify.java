@@ -16,7 +16,7 @@ class Wikify {
 		content = content.replaceAll(" ([IVX]+) СТЕПЕНИ", " {{nobr|$1 СТЕПЕНИ}}");
 		content = content.replaceAll(" ([IVX]+) ЛЕТ", " {{nobr|$1 ЛЕТ}}");
 
-		content = content.replaceAll(" N (\\d+(-рп|-ФЗ)?)([ ,;)»\n])", " {{nobr|№ $1}}$3");
+		content = content.replaceAll(" N (\\d+(-рп|-ФЗ|-ФКЗ|с)?)([ ,;)»\n])", " {{nobr|№ $1}}$3");
 		content = content.replaceAll(" \\- ", "\u00A0— ");
 		content = content.replaceAll("==\n\n([А-Яа-я])", "==\n$1");
 		return content;

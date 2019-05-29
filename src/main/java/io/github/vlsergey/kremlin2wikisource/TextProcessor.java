@@ -53,6 +53,8 @@ public class TextProcessor {
 		NORMALIZED_DOC_TYPE_NAMES.put("федерального закона", "Федеральный закон");
 		NORMALIZED_DOC_TYPE_NAMES.put("федеральный закон", "Федеральный закон");
 		NORMALIZED_DOC_TYPE_NAMES.put("федеральными законами", "Федеральный закон");
+
+		NORMALIZED_DOC_TYPE_NAMES.put("федеральным конституционным законом", "Федеральный конституционный закон");
 	}
 
 	static String addWikilinks(String src, String title, String wikilink) {
@@ -565,7 +567,7 @@ public class TextProcessor {
 		final String[] lines = (src.trim() + "\n").replace("\n", "\n☆").split("☆");
 		for (int lineIndex = 0; lineIndex < lines.length; lineIndex++) {
 			final String line = lines[lineIndex];
-			if (line.matches("^\\s+(УТВЕРЖДЕН[АЫ]|ПРИЛОЖЕНИЕ)(\\s+N\\s+[0-9])?\n$")) {
+			if (line.matches("^\\s+(УТВЕРЖДЕН[АОЫ]|ПРИЛОЖЕНИЕ)(\\s+N\\s+[0-9])?\n$")) {
 				while (lineIndex < lines.length && !lines[lineIndex].trim().isEmpty()) {
 					String nextLine = lines[lineIndex].trim();
 					nextLine = nextLine.replaceAll("N (\\d[\\d\\-а-я]*)([ ]|$)", "№ $1$2");
@@ -590,12 +592,17 @@ public class TextProcessor {
 
 					lineIndex++;
 					while (lineIndex < lines.length && !lines[lineIndex].trim().isEmpty()) {
+						if (lines[lineIndex].trim().startsWith("(В редакции ")) {
+							break;
+						}
 						if (!lines[lineIndex].matches("^\\s*[А-Я ]+\n$")) {
 							if (stillAllCaps) {
 								stillAllCaps = false;
 								header.append(" <br>");
 							}
 						}
+						if (!"<br>".equals(header.substring(header.length() - 4)))
+							header.append(" ");
 						header.append(lines[lineIndex].trim());
 						lines[lineIndex] = "";
 						lineIndex++;
@@ -708,8 +715,8 @@ public class TextProcessor {
 		content = processTables(content);
 
 		// строки, начавшиеся с открытия скобки
-		content = replaceAll(content, Pattern.compile("(\\n|^)\\s*\\(([^\\)]+)\\)\n", Pattern.DOTALL), true,
-				(matcher, g1) -> matcher.group(1) + "(" + matcher.group(2).replace('\n', ' ') + ")\n");
+		content = replaceAll(content, Pattern.compile("(\\n|^)([ ]*\\()([^\\)]+)\\)\n", Pattern.DOTALL), true,
+				(matcher, g1) -> matcher.group(1) + matcher.group(2) + matcher.group(3).replace('\n', ' ') + ")\n");
 
 		// объединение строк
 		content = Pattern.compile("\\n     (.)", Pattern.MULTILINE).matcher(content).replaceAll("\n\n$1");
@@ -790,11 +797,12 @@ public class TextProcessor {
 				+ "|" + "[Уу]каз" + presidentRegexp //
 				+ "|" + "[Уу]каза" + presidentRegexp //
 				+ "|" + "[Уу]казом" + presidentRegexp //
-				+ "|" + "[Фф]едерального закона" //
-				+ "|" + "[Фф]едеральный закон" //
+				+ "|" + "Федерального закона" //
+				+ "|" + "Федеральный закон" //
+				+ "|" + "Федеральным конституционным законом" //
 				+ ")";
 		final String docDateRegexp = "от (" + REGEXP_DATE_DOTS + "|" + REGEXP_DATE_HUMAN + ") г.";
-		final String docNumberRegexp = "\\{\\{nobr\\|№ (\\d[\\dа-я]*\\-?Ф?З?р?п?)\\}\\}";
+		final String docNumberRegexp = "\\{\\{nobr\\|№ (\\d[\\dа-я]*\\-?Ф?К?З?р?п?)\\}\\}";
 		final String docOptionalTitleRegexp = "( «([^\"\\«\\»]+)»)?";
 
 		content = replaceAll(content, "статьей (\\d+) " + singleDocTypeRegexp + " " + docDateRegexp + " "
