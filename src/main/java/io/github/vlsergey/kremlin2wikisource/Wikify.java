@@ -22,6 +22,24 @@ class Wikify {
 		return content;
 	}
 
+	static String addNonbreakingSpaces(String src) {
+		String result = src;
+		result = result.replaceAll("([а-я]) бул\\.,", "$1\u00a0бул.,");
+		result = result.replaceAll("(^| )г\\. ([А-Я])", "$1г.\u00a0$2");
+		result = result.replaceAll(", д\\. ([0-9])", ", д.\u00a0$1");
+		result = result.replaceAll(", корп\\. ([0-9])", ", корп.\u00a0$1");
+		result = result.replaceAll("([а-я]) обл\\.,", "$1\u00a0обл.,");
+		result = result.replaceAll("([а-я]) пер\\.,", "$1\u00a0пер.,");
+		result = result.replaceAll("([а-я]) пл\\.,", "$1\u00a0пл.,");
+		result = result.replaceAll(", пос\\. ([А-Я])", ", пос.\u00a0$1");
+		result = result.replaceAll("([а-я]) пр\\.,", "$1\u00a0пр.,");
+		result = result.replaceAll("([а-я]) просп\\.,", "$1\u00a0просп.,");
+		result = result.replaceAll("([а-я]) р\\-н,", "$1\u00a0р-н,");
+		result = result.replaceAll(", стр\\. ([0-9])", ", стр.\u00a0$1");
+		result = result.replaceAll(", ул\\. ([А-Я])", ", ул.\u00a0$1");
+		return result;
+	}
+
 	static String wikifyQuotes(String content) {
 		// wikify quotes
 		String emphasizeTokens = content;

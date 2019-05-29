@@ -687,7 +687,8 @@ public class TextProcessor {
 						continue tableCandidate;
 					}
 					for (int j = 0; j < nextRow.length; j++) {
-						withTables.append("| " + nextRow[j] + "\n");
+						withTables
+								.append("| align=left valign=top | " + Wikify.addNonbreakingSpaces(nextRow[j]) + "\n");
 					}
 					withTables.append("|-\n");
 					Arrays.fill(nextRow, "");
@@ -723,6 +724,7 @@ public class TextProcessor {
 		content = Pattern.compile("([^ \n\\}\\>])\\n([^\n \\{\\|\\<\\!])", Pattern.MULTILINE).matcher(content)
 				.replaceAll("$1 $2");
 		content = content.replace("дом- интернат", "дом-интернат");
+		content = content.replace("Кабардино- Балкарская", "Кабардино-Балкарская");
 		content = content.replace("психо- неврологический", "психо-неврологический");
 		content = content.replace("социально- реабилитационный", "социально-реабилитационный");
 

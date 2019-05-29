@@ -31,7 +31,9 @@ public class TextProcessorTest {
 		String actual = textProcessor
 				.importAsРаспоряжение(URI.create("http://www.kremlin.ru/acts/bank/" + bankActNumber), title, summary,
 						src)
-				.getWikisourceContent().trim();
+				.getWikisourceContent().trim()
+		// .replace('\u00a0', '·')
+		;
 
 		String expected = IOUtils.toString(
 				TextProcessorTest.class.getResource("/ru/kremlin/acts/bank/" + bankActNumber + ".wiki").toURI(),
@@ -155,6 +157,11 @@ public class TextProcessorTest {
 		testAsУказ(18560, "Указ Президента Российской Федерации от 21.09.2002 г. № 1011",
 				"Вопросы Министерства Российской Федерации по делам гражданской обороны, "
 						+ "чрезвычайным ситуациям и ликвидации последствий стихийных бедствий");
+	}
+
+	@Test
+	public void test18574() throws Exception {
+		testAsРаспоряжение(18574, "Распоряжение Президента Российской Федерации от 23.09.2002 г. № 450-рп", "");
 	}
 
 }
