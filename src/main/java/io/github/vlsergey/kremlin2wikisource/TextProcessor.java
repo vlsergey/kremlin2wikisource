@@ -49,6 +49,7 @@ public class TextProcessor {
 		NORMALIZED_DOC_TYPE_NAMES.put("указами президента российской федерации", "Указ Президента РФ");
 		NORMALIZED_DOC_TYPE_NAMES.put("указов президента российской федерации", "Указ Президента РФ");
 		NORMALIZED_DOC_TYPE_NAMES.put("указом президента российской федерации", "Указ Президента РФ");
+		NORMALIZED_DOC_TYPE_NAMES.put("указу президента российской федерации", "Указ Президента РФ");
 
 		NORMALIZED_DOC_TYPE_NAMES.put("указа президента рсфср", "Указ Президента РСФСР");
 
@@ -742,6 +743,7 @@ public class TextProcessor {
 				+ "|" + "[Уу]каз" + presidentRegexp //
 				+ "|" + "[Уу]каза" + presidentRegexp //
 				+ "|" + "[Уу]казом" + presidentRegexp //
+				+ "|" + "[Уу]казу" + presidentRegexp //
 				+ "|" + "[Уу]каза Президента РСФСР" //
 				+ "|" + "Федерального закона" //
 				+ "|" + "Федеральный закон" //
