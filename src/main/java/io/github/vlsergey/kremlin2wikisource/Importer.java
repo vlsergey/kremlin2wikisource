@@ -23,7 +23,8 @@ public class Importer {
 	private static final Scanner scan = new Scanner(System.in);
 
 	static String prepareHtml(String html) {
-		return html.replace('\u00a0', ' ');
+		return html //
+				.replace('\u00a0', ' ');
 	}
 
 	private static Boolean prompt(String prmpt) {
@@ -116,7 +117,7 @@ public class Importer {
 
 	public void run() throws Exception {
 		// first was 18272
-		for (int pageId = 18655; pageId <= 20000; pageId++) {
+		for (int pageId = 18656; pageId <= 20000; pageId++) {
 			URI uri = URI.create("http://www.kremlin.ru/acts/bank/" + pageId);
 			try {
 				importFrom(uri);

@@ -535,6 +535,7 @@ public class TextProcessor {
 		final String[] lines = (src.trim() + "\n").replace("\n", "\n☆").split("☆");
 		for (int lineIndex = 0; lineIndex < lines.length; lineIndex++) {
 			final String line = lines[lineIndex];
+
 			if (line.matches("^\\s+(УТВЕРЖДЕН[АОЫ]|ПРИЛОЖЕНИЕ)(\\s+N\\s+[0-9])?\n$")) {
 				while (lineIndex < lines.length && !lines[lineIndex].trim().isEmpty()) {
 					String nextLine = lines[lineIndex].trim();
@@ -549,38 +550,56 @@ public class TextProcessor {
 				if (lineIndex == lines.length) {
 					break;
 				}
+				lineIndex = processSubdocsTitle(lines, lineIndex);
+			}
 
-				if (lines[lineIndex].matches("^\\s*[А-Я ]+\n$")) {
-					// yes, it's header
-					int headerStartLine = lineIndex;
-					StringBuilder header = new StringBuilder();
-					header.append("== ");
-					header.append(lines[lineIndex].trim());
-					boolean stillAllCaps = true;
+			if (line.matches("^\\s+Проект\n$")) {
+				lines[lineIndex] = "{{right|" + line.trim() + "}}\n";
+				lineIndex++;
 
+				// suppose next line is header
+				while (lineIndex < lines.length && lines[lineIndex].trim().isEmpty())
 					lineIndex++;
-					while (lineIndex < lines.length && !lines[lineIndex].trim().isEmpty()) {
-						if (lines[lineIndex].trim().startsWith("(В редакции ")) {
-							break;
-						}
-						if (!lines[lineIndex].matches("^\\s*[А-Я ]+\n$")) {
-							if (stillAllCaps) {
-								stillAllCaps = false;
-								header.append(" <br>");
-							}
-						}
-						if (!"<br>".equals(header.substring(header.length() - 4)))
-							header.append(" ");
-						header.append(lines[lineIndex].trim());
-						lines[lineIndex] = "";
-						lineIndex++;
-					}
-					header.append(" ==\n");
-					lines[headerStartLine] = header.toString();
+				if (lineIndex == lines.length) {
+					break;
 				}
+				lineIndex = processSubdocsTitle(lines, lineIndex);
 			}
 		}
 		return join(lines);
+	}
+
+	private int processSubdocsTitle(final String[] lines, final int titleStartLine) {
+		if (!lines[titleStartLine].matches("^\\s*[А-Я ]+\n$")) {
+			return titleStartLine;
+		}
+
+		// yes, it's header
+		StringBuilder header = new StringBuilder();
+		header.append("== ");
+		header.append(lines[titleStartLine].trim());
+		boolean stillAllCaps = true;
+
+		int lineNumber = titleStartLine + 1;
+		while (lineNumber < lines.length && !lines[lineNumber].trim().isEmpty()) {
+			if (lines[lineNumber].trim().startsWith("(В редакции ")) {
+				break;
+			}
+			if (!lines[lineNumber].matches("^\\s*[А-Я ]+\n$")) {
+				if (stillAllCaps) {
+					stillAllCaps = false;
+					header.append(" <br>");
+				}
+			}
+			if (!"<br>".equals(header.substring(header.length() - 4)))
+				header.append(" ");
+			header.append(lines[lineNumber].trim());
+			lines[lineNumber] = "";
+			lineNumber++;
+		}
+		header.append(" ==\n");
+		lines[titleStartLine] = header.toString();
+		return lineNumber;
 	}
 
 	private String processTables(String src) {
@@ -718,6 +737,8 @@ public class TextProcessor {
 
 		// other centered strings
 		content = content.replaceAll("\\n[ ]+([^\\s].*)\\n", "\n{{center|$1}}\n");
+		content = content.replace("{{center|Статья З}}", "{{center|Статья 3}}");
+		content = content.replaceAll("\n\\{\\{center\\|(Статья \\d+)\\}\\}\\n", "\n=== $1 ===\n");
 
 		content = AwardsUtils.wikilink(content);
 
@@ -859,6 +880,10 @@ public class TextProcessor {
 		content = content.replaceAll("Уставом Красноярского края", "[[Устав Красноярского края|$0]]");
 
 		content = content.replaceAll("Трудового кодекса Российской Федерации", "[[Трудовой кодекс РФ|$0]]");
+
+		// bottoms and signatures
+		content = content.replaceAll("\nЗа Российскую Федерацию За ([а-яА-Я ]+)\n", "\n" + "{| width=100% |\n"
+				+ "| align=left | За Российскую Федерацию\n" + "| align=right | За $1\n" + "|}\n");
 
 		return content;
 	}
