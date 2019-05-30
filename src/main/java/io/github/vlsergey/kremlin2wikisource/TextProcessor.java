@@ -272,6 +272,10 @@ public class TextProcessor {
 				+ "'}}'<div class=\"text\">\n\n{6}\n\n</div>", docNumber, docDateStr,
 				processTextContent(summary).trim(), url, etc, expired, content.trim());
 
+		if (summary.startsWith("О помиловании ")) {
+			wikiContent += "\n\n[[Категория:Указы Президента РФ о помиловании]]\n";
+		}
+
 		final String articleTitle = "Указ Президента РФ от " + docDateStr + " № " + docNumber;
 		ToUpload toUpload = new ToUpload();
 		toUpload.setWikisourceTitle(articleTitle);
