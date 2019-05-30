@@ -50,6 +50,8 @@ public class TextProcessor {
 		NORMALIZED_DOC_TYPE_NAMES.put("указов президента российской федерации", "Указ Президента РФ");
 		NORMALIZED_DOC_TYPE_NAMES.put("указом президента российской федерации", "Указ Президента РФ");
 
+		NORMALIZED_DOC_TYPE_NAMES.put("указа президента рсфср", "Указ Президента РСФСР");
+
 		NORMALIZED_DOC_TYPE_NAMES.put("федерального закона", "Федеральный закон");
 		NORMALIZED_DOC_TYPE_NAMES.put("федеральный закон", "Федеральный закон");
 		NORMALIZED_DOC_TYPE_NAMES.put("федеральными законами", "Федеральный закон");
@@ -736,6 +738,7 @@ public class TextProcessor {
 				+ "|" + "[Уу]каз" + presidentRegexp //
 				+ "|" + "[Уу]каза" + presidentRegexp //
 				+ "|" + "[Уу]казом" + presidentRegexp //
+				+ "|" + "[Уу]каза Президента РСФСР" //
 				+ "|" + "Федерального закона" //
 				+ "|" + "Федеральный закон" //
 				+ "|" + "Федеральным конституционным законом" //
@@ -848,6 +851,8 @@ public class TextProcessor {
 				"[[Резолюция Совета Безопасности ООН № S/RES/$1 ($2)|$0]]");
 
 		content = content.replaceAll("Уставом Красноярского края", "[[Устав Красноярского края|$0]]");
+
+		content = content.replaceAll("Трудового кодекса Российской Федерации", "[[Трудовой кодекс РФ|$0]]");
 
 		return content;
 	}
