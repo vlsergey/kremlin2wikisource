@@ -10,7 +10,7 @@ public class RegexpUtils {
 	private static BitSet getWikilinkedChars(String src) {
 		final BitSet result = new BitSet(src.length());
 
-		for (int c = src.indexOf('['); c != -1; c = src.indexOf('-', c + 1)) {
+		for (int c = src.indexOf('['); c != -1; c = src.indexOf('[', c + 1)) {
 			int firstClosing = src.indexOf(']', c);
 			if (firstClosing == -1) {
 				result.set(c, src.length(), true);
