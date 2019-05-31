@@ -3,6 +3,7 @@ package io.github.vlsergey.kremlin2wikisource;
 import static io.github.vlsergey.kremlin2wikisource.RegexpUtils.replaceAll;
 
 import java.util.regex.Pattern;
+import org.apache.commons.lang3.StringUtils;
 
 class AwardsUtils {
 
@@ -49,7 +50,7 @@ class AwardsUtils {
 
 	private static String replace(String src, String title, String wikilink) {
 		return RegexpUtils.replaceAll(src,
-				Pattern.compile("(^| )(" + Pattern.quote(title) + ")( |$)",
+				Pattern.compile("(^| )(" + StringUtils.join(title.split(" "), "\\s+") + ")( |$)",
 						Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE),
 				false, (matcher, g1) -> matcher.group(1) + "[[:w:ru:" + wikilink + "|" + matcher.group(2) + "]]"
 						+ matcher.group(3));

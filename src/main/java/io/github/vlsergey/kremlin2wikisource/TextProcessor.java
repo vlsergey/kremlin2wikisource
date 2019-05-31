@@ -752,6 +752,9 @@ public class TextProcessor {
 		// splitted headers
 		content = content.replaceAll("\\n[ ]{1,}([\"А-Я\\- ]+)\\n\\n[ ]{1,}([А-ЯIVX][\"IVXА-Я\\- ]+)\\n",
 				"\n      $1 $2\n");
+		// problems like http://www.kremlin.ru/acts/bank/18786 with headers case
+		content = content.replaceAll("\\n[ ]{1,}([\"А-Я\\- ]+)\\n\\n[ ]{1,}([IVX]+) степени\\n",
+				"\n      $1 $2 СТЕПЕНИ\n");
 
 		// headers
 		content = content.replace(
