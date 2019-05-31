@@ -35,6 +35,7 @@ class Wikify {
 		result = result.replaceAll("([а-я]) пр\\.,", "$1\u00a0пр.,");
 		result = result.replaceAll("([а-я]) просп\\.,", "$1\u00a0просп.,");
 		result = result.replaceAll("([а-я]) р\\-н,", "$1\u00a0р-н,");
+		result = result.replaceAll(", с\\. ([А-Я])", ", с.\u00a0$1");
 		result = result.replaceAll(", стр\\. ([0-9])", ", стр.\u00a0$1");
 		result = result.replaceAll(", ул\\. ([А-Я])", ", ул.\u00a0$1");
 		return result;
