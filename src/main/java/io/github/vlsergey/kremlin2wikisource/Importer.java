@@ -53,6 +53,7 @@ public class Importer {
 	private WikisourceApiHelper wikisourceApiHelper;
 
 	private void importFrom(URI originalUrl) throws Exception {
+		log.info("Importing from {}", originalUrl);
 
 		int page = 1;
 		URI nextUrl = originalUrl;
@@ -117,7 +118,7 @@ public class Importer {
 
 	public void run() throws Exception {
 		// first was 18272
-		for (int pageId = 18777; pageId <= 20000; pageId++) {
+		for (int pageId = 18783; pageId <= 20000; pageId++) {
 			URI uri = URI.create("http://www.kremlin.ru/acts/bank/" + pageId);
 			try {
 				importFrom(uri);
