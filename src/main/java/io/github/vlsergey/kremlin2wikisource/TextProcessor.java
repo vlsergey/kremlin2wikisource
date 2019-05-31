@@ -51,6 +51,7 @@ public class TextProcessor {
 		NORMALIZED_DOC_TYPE_NAMES.put("указом президента российской федерации", "Указ Президента РФ");
 		NORMALIZED_DOC_TYPE_NAMES.put("указу президента российской федерации", "Указ Президента РФ");
 
+		NORMALIZED_DOC_TYPE_NAMES.put("указ президента рсфср", "Указ Президента РСФСР");
 		NORMALIZED_DOC_TYPE_NAMES.put("указа президента рсфср", "Указ Президента РСФСР");
 
 		NORMALIZED_DOC_TYPE_NAMES.put("федерального закона", "Федеральный закон");
@@ -84,6 +85,18 @@ public class TextProcessor {
 
 	@Autowired
 	private WikidataModelHelper wikidataModelHelper;
+
+	private String addCategory(String summary, String wikiContent, final Pattern summaryPattern,
+			final String category) {
+		if (summaryPattern.matcher(summary).matches())
+			wikiContent += "\n\n[[Категория:" + category + "]]\n";
+		return wikiContent;
+	}
+
+	private String addCategory(String summary, String wikiContent, final String summaryPrefix, final String category) {
+		return addCategory(summary, wikiContent, Pattern.compile("^" + Pattern.compile(summaryPrefix) + ".*$"),
+				category);
+	}
 
 	private Optional<Integer> getDelimeter(int lines, int[] candidates, float minSureProcent) {
 		int[] candidateColumns = IntStream.range(0, candidates.length).filter(i -> candidates[i] != 0).mapToObj(i -> i)
@@ -273,9 +286,23 @@ public class TextProcessor {
 				+ "'}}'<div class=\"text\">\n\n{6}\n\n</div>", docNumber, docDateStr,
 				processTextContent(summary).trim(), url, etc, expired, content.trim());
 
-		if (summary.startsWith("О помиловании ")) {
-			wikiContent += "\n\n[[Категория:Указы Президента РФ о помиловании]]\n";
-		}
+		wikiContent = addCategory(summary, wikiContent, "О награждении государственными наградами ",
+				"Указы о награждении государственными наградами РФ");
+		wikiContent = addCategory(summary, wikiContent, Pattern.compile("^О награждении орденом Дружбы(?! народов).*$"),
+				"Указы Президента РФ о награждении орденом Дружбы");
+		wikiContent = addCategory(summary, wikiContent, "О награждении орденом Дружбы народов",
+				"Указы Президента РФ о награждении орденом Дружбы народов");
+		wikiContent = addCategory(summary, wikiContent, "О награждении орденом «За заслуги перед Отечеством» ",
+				"Указы о награждении орденом «За заслуги перед Отечеством»");
+		wikiContent = addCategory(summary, wikiContent, "О назначении судей ",
+				"Указы Президента РФ о назначении судей");
+		wikiContent = addCategory(summary, wikiContent, "О помиловании ", "Указы Президента РФ о помиловании");
+		wikiContent = addCategory(summary, wikiContent, "О присвоении квалификационного разряда ",
+				"Указы Президента РФ о присвоении квалификационных разрядов");
+		wikiContent = addCategory(summary, wikiContent, "О присвоении квалификационных разрядов ",
+				"Указы Президента РФ о присвоении квалификационных разрядов");
+		wikiContent = addCategory(summary, wikiContent, "О присвоении классных чинов ",
+				"Указы Президента РФ о присвоении классных чинов");
 
 		final String articleTitle = "Указ Президента РФ от " + docDateStr + " № " + docNumber;
 		ToUpload toUpload = new ToUpload();
@@ -536,7 +563,7 @@ public class TextProcessor {
 		for (int lineIndex = 0; lineIndex < lines.length; lineIndex++) {
 			final String line = lines[lineIndex];
 
-			if (line.matches("^\\s+(УТВЕРЖДЕН[АОЫ]|ПРИЛОЖЕНИЕ)(\\s+N\\s+[0-9])?\n$")) {
+			if (line.matches("^\\s+(УТВЕРЖДЕН|УТВЕРЖДЕН[АОЫ]|ПРИЛОЖЕНИЕ)(\\s+N\\s+[0-9])?\n$")) {
 				while (lineIndex < lines.length && !lines[lineIndex].trim().isEmpty()) {
 					String nextLine = lines[lineIndex].trim();
 					nextLine = nextLine.replaceAll("N (\\d[\\d\\-а-я]*)([ ]|$)", "№ $1$2");
@@ -752,7 +779,7 @@ public class TextProcessor {
 
 		// Ссылки на различные документы, хранящиеся в Викитеке
 		content = content.replaceAll("(статье|статьи) (\\d+) Конституции Российской Федерации",
-				"[[Конституция Российской Федерации#Статья $2|$1 $2 Конституции Российской Федерации]]");
+				"[[Конституция Российской Федерации#Статья $2|$0]]");
 
 		content = content.replaceAll("статьями (\\d+) и (\\d+) Конституции Российской Федерации",
 				"[[Конституция Российской Федерации#Статья $1|статьями $1]] и [[Конституция Российской Федерации#Статья $2|$2]] Конституции Российской Федерации");
@@ -761,13 +788,18 @@ public class TextProcessor {
 		final String singleDocTypeRegexp = "(" + "[Рр]аспоряжение" + presidentRegexp //
 				+ "|" + "[Рр]аспоряжением" + presidentRegexp //
 				+ "|" + "[Рр]аспоряжения" + presidentRegexp //
+
 				+ "|" + "[Уу]каз" + presidentRegexp //
 				+ "|" + "[Уу]каза" + presidentRegexp //
 				+ "|" + "[Уу]казом" + presidentRegexp //
 				+ "|" + "[Уу]казу" + presidentRegexp //
+
+				+ "|" + "[Уу]каз Президента РСФСР" //
 				+ "|" + "[Уу]каза Президента РСФСР" //
+
 				+ "|" + "Федерального закона" //
 				+ "|" + "Федеральный закон" //
+
 				+ "|" + "Федеральным конституционным законом" //
 				+ ")";
 		final String docDateRegexp = "от (" + REGEXP_DATE_DOTS + "|" + REGEXP_DATE_HUMAN + ") г.";
@@ -884,6 +916,9 @@ public class TextProcessor {
 		// bottoms and signatures
 		content = content.replaceAll("\nЗа Российскую Федерацию За ([а-яА-Я ]+)\n", "\n" + "{| width=100% |\n"
 				+ "| align=left | За Российскую Федерацию\n" + "| align=right | За $1\n" + "|}\n");
+
+		content = content.replaceAll("(статьей) (\\d+) Федерального закона «О прокуратуре Российской Федерации»",
+				"[[Федеральный закон от 17.01.1992 № 2202-I#Статья $2|$0]]");
 
 		return content;
 	}

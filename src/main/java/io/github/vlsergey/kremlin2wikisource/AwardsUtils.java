@@ -23,6 +23,7 @@ class AwardsUtils {
 		content = wikilinkImpl(content, "МЕДАЛЬЮ \"ЗА СПАСЕНИЕ ПОГИБАВШИХ\"", "Медаль «За спасение погибавших»");
 
 		content = wikilinkImpl(content, "ОРДЕНОМ АЛЕКСАНДРА НЕВСКОГО", "Орден Александра Невского (Россия)");
+		content = wikilinkImpl(content, "ОРДЕНОМ ДРУЖБЫ НАРОДОВ", "Орден Дружбы народов)");
 		content = wikilinkImpl(content, "ОРДЕНОМ ДРУЖБЫ", "Орден Дружбы (Россия)");
 		content = wikilinkImpl(content, "ОРДЕНОМ МУЖЕСТВА", "Орден Мужества");
 		content = wikilinkImpl(content, "ОРДЕНОМ ПОЧЕТА", "Орден Почёта (Россия)");
@@ -43,8 +44,11 @@ class AwardsUtils {
 	}
 
 	private static String replace(String src, String title, String wikilink) {
-		return Pattern.compile("( )(" + Pattern.quote(title) + ")( )", Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE)
-				.matcher(src).replaceAll("$1[[:w:ru:" + wikilink + "|$2]]$3");
+		return RegexpUtils.replaceAll(src,
+				Pattern.compile("(^| )(" + Pattern.quote(title) + ")( |$)",
+						Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE),
+				false, (matcher, g1) -> matcher.group(1) + "[[:w:ru:" + wikilink + "|" + matcher.group(2) + "]]"
+						+ matcher.group(3));
 	}
 
 }

@@ -57,7 +57,7 @@ class Wikify {
 
 	static String wikifyQuotesImpl(String src) {
 		String result = src;
-		result = result.replaceAll("([ \\[]|^)\"([А-Яа-я][^\"]+[А-Яа-я0-9\\)])\"([ ,;\\]\\)]|$)", "$1«$2»$3");
+		result = result.replaceAll("([ \\[]|^)\"([А-Яа-я][^\"]+[А-Яа-я0-9\\)])\"([ ,;\\:\\]\\)]|$)", "$1«$2»$3");
 
 		// single char
 		result = result.replaceAll("( )\"([а-я])\"( )", "$1«$2»$3");
