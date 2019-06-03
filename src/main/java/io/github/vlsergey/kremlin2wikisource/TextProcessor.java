@@ -747,7 +747,9 @@ public class TextProcessor {
 			content = whitespacePattern.matcher(content).replaceAll("$1 ");
 		}
 
+		content = content.replace("П О Л О Ж Е Н И Е", "{{razr|ПОЛОЖЕНИЕ}}");
 		content = content.replace("п о с т а н о в л я ю", "{{razr|постановляю}}");
+		content = content.replace("С О С Т А В", "{{razr|СОСТАВ}}");
 
 		// splitted headers
 		content = content.replaceAll("\\n[ ]{1,}([\"А-Я\\- ]+)\\n\\n[ ]{1,}([А-ЯIVX][\"IVXА-Я\\- ]+)\\n",
