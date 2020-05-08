@@ -7,6 +7,7 @@ import java.net.URI;
 import java.text.MessageFormat;
 import java.text.SimpleDateFormat;
 import java.util.*;
+import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.IntStream;
@@ -351,7 +352,7 @@ public class TextProcessor {
 				for (int n = i + 1; n < lines.length; n++) {
 					String nextLine = lines[n];
 					if ("\n".equals(nextLine)) {
-						candidates[d]++;
+						candidates[d] += n - i + 1;
 						continue d;
 					}
 					final int nextLineFirstNonSpace = indexOfAnyBut(nextLine, ' ');
@@ -364,7 +365,7 @@ public class TextProcessor {
 			}
 		}
 
-		Optional<Integer> delimeterPositionOptional = getDelimeter(lines.length, candidates, 0.03F);
+		Optional<Integer> delimeterPositionOptional = getDelimeter(lines.length, candidates, 0.05F);
 		if (!delimeterPositionOptional.isPresent()) {
 			return src;
 		}
@@ -558,12 +559,15 @@ public class TextProcessor {
 		return join(lines);
 	}
 
-	private String processSubdocs(String src) {
+	private String splitIntoSubdocsAndProcess(String src, Function<String, String> subdocProcessor) {
 		final String[] lines = (src.trim() + "\n").replace("\n", "\n☆").split("☆");
+		final List<Integer> subdocsStartLines = new ArrayList<>();
+
 		for (int lineIndex = 0; lineIndex < lines.length; lineIndex++) {
 			final String line = lines[lineIndex];
 
-			if (line.matches("^\\s+(УТВЕРЖДЕН|УТВЕРЖДЕН[АОЫ]|ПРИЛОЖЕНИЕ)(\\s+N\\s+[0-9])?\n$")) {
+			if (line.matches("^\\s+(УТВЕРЖДЕН|УТВЕРЖДЕН[АОЫ]|ПРИЛОЖЕНИЕ|)(\\s+N\\s+[0-9])?\n$")) {
+				subdocsStartLines.add(lineIndex);
 				while (lineIndex < lines.length && !lines[lineIndex].trim().isEmpty()) {
 					String nextLine = lines[lineIndex].trim();
 					nextLine = nextLine.replaceAll("N (\\d[\\d\\-а-я]*)([ ]|$)", "№ $1$2");
@@ -581,6 +585,7 @@ public class TextProcessor {
 			}
 
 			if (line.matches("^\\s+Проект\n$")) {
+				subdocsStartLines.add(lineIndex);
 				lines[lineIndex] = "{{right|" + line.trim() + "}}\n";
 				lineIndex++;
 
@@ -593,7 +598,18 @@ public class TextProcessor {
 				lineIndex = processSubdocsTitle(lines, lineIndex);
 			}
 		}
-		return join(lines);
+
+		subdocsStartLines.add(lines.length);
+		List<String> subDocs = new ArrayList<>();
+		int startLine = 0;
+		for (int nextHeaderLine : subdocsStartLines) {
+			final String unprocessedSubdoc = join(Arrays.copyOfRange(lines, startLine, nextHeaderLine));
+			final String processedSubdoc = subdocProcessor.apply(unprocessedSubdoc);
+			subDocs.add(processedSubdoc.trim() + "\n");
+			startLine = nextHeaderLine;
+		}
+
+		return join(subDocs).trim();
 	}
 
 	private int processSubdocsTitle(final String[] lines, final int titleStartLine) {
@@ -725,7 +741,10 @@ public class TextProcessor {
 	}
 
 	String processTextContent(String content) {
-		content = processSubdocs(content);
+		return splitIntoSubdocsAndProcess(content, this::processTextContentImpl);
+	}
+
+	String processTextContentImpl(String content) {
 		content = processObvilions(content);
 		content = processTables(content);
 

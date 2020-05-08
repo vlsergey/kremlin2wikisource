@@ -67,7 +67,14 @@ public class Importer {
 				title = StringEscapeUtils.unescapeHtml4(StringUtils.substringBetween(html, "<h1>", "</h1>"));
 				summary = StringEscapeUtils.unescapeHtml4(StringUtils.substringBetween(html,
 						"<div class=\"read__lead entry-summary p-summary\" itemprop=\"description\">", "</div>"));
-				content = StringEscapeUtils.unescapeHtml4(StringUtils.substringBetween(html, "<pre>", "</pre>"));
+
+				if (html.contains("<div class=\"reader_act_body\"><p>")) {
+					content = StringEscapeUtils.unescapeHtml4(
+							StringUtils.substringBetween(html, "<div class=\"reader_act_body\"><p>", "</p></div>"));
+				} else {
+					content = StringEscapeUtils.unescapeHtml4(StringUtils.substringBetween(html, "<pre>", "</pre>"));
+				}
+
 				if (content == null) {
 					content = StringEscapeUtils.unescapeHtml4(StringUtils.substringBetween(html, "<pre>", "</div>"));
 				}
@@ -89,6 +96,11 @@ public class Importer {
 			nextUrl = URI.create(originalUrl + "/page/" + (++page));
 		} while (html.contains("Показать следующую страницу документа"));
 		content = StringEscapeUtils.unescapeHtml4(content);
+
+		content = content.trim();
+		if (content.endsWith("</p>")) {
+			content = content.substring(0, content.length() - "</p>".length());
+		}
 
 		ToUpload toUpload;
 		if (title.startsWith("Распоряжение Президента Российской Федерации от")) {
@@ -118,7 +130,7 @@ public class Importer {
 
 	public void run() throws Exception {
 		// first was 18272
-		for (int pageId = 18833; pageId <= 20000; pageId++) {
+		for (int pageId = 18853; pageId <= 20000; pageId++) {
 			URI uri = URI.create("http://www.kremlin.ru/acts/bank/" + pageId);
 			try {
 				importFrom(uri);

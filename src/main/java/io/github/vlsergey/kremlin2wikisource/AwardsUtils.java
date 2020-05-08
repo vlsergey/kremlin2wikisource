@@ -8,6 +8,8 @@ import org.apache.commons.lang3.StringUtils;
 class AwardsUtils {
 
 	static String wikilink(String content) {
+		content = wikilinkImpl(content, "ГЕРОЯ РОССИЙСКОЙ ФЕДЕРАЦИИ", "Герой Российской Федерации");
+		
 		content = replaceAll(content, "\\n=== [«\"]ЗАСЛУЖЕННЫЙ (.*) РОССИЙСКОЙ ФЕДЕРАЦИИ[»\"] ===\n", true,
 				(matcher, g1) -> "\n=== [[:w:ru:Заслуженный " + g1.toLowerCase() + " Российской Федерации|«ЗАСЛУЖЕННЫЙ "
 						+ g1 + " {{nobr|РОССИЙСКОЙ ФЕДЕРАЦИИ}}»]] ===\n");
